@@ -1,16 +1,27 @@
 
-import cv2, os
+import cv2, os, glob
 import numpy as np
 import matplotlib.pyplot as plt
 # from mayavi import mlab
 from numpy.linalg import norm
 
 
-
 # LOADING and SAVING data
 
 def load_camera_calibration(filename):
-	# loads camera intrinsics
+	"""
+	Loads camera intrinsics from YAML file
+
+	Args:
+		filename
+
+	Returns:
+		width: camera image width
+		height: camera image height
+		M: calibration matrix
+		D: distortion parameters
+
+	"""
 
 	if os.path.isfile(filename):
 
@@ -30,7 +41,17 @@ def load_camera_calibration(filename):
 		print("calibration file not found!")
 
 def save_lidar_calibration_data(filename, R, T, C): # save 
-	print("saving lidar calibration file: ", filename)
+
+	"""
+	Saves camera-lidar data to YAML file
+
+	Args:
+		filename
+		R: rotation matrix from lidar to camera
+		T: translation matrix from lidar to camera
+		C: transformation matrix from lidar to camera coordinate system
+	"""
+
 	cv_file = cv2.FileStorage(filename, cv2.FILE_STORAGE_WRITE)
 	cv_file.write("R", R)
 	cv_file.write("T", T)
@@ -170,21 +191,27 @@ def get_grid(): # for calibration, not needed really
 
 	return objectPoints
 
-def get_edges(im, M, corners, c=1):
+def find_corners(im, patternsize = (3,5)):
+
+	ret, corners = cv2.findCirclesGrid(im, patternsize, flags=cv2.CALIB_CB_ASYMMETRIC_GRID+cv2.CALIB_CB_CLUSTERING)
+
+	return corners if ret else None
+
+def get_edges(im, M, corners, thickness=1):
 
 	grid = get_grid()
 
 	_, rvec, tvec = cv2.solvePnP(grid, corners, M, None, flags=cv2.SOLVEPNP_IPPE)
 	mask = get_mask(im.shape[:-1], rvec, tvec, M)
 
-	n_blur = c
-	n_blur+=1 if n_blur%2==0 else 0
+	# n_blur = thickness
+	thickness+=1 if thickness%2==0 else 0
 
-	sigma = n_blur//5
+	sigma = thickness//5
 	# sigma = n_blur//10
 
 	edges = cv2.Canny(mask, threshold1=0, threshold2=100).astype(np.float32)
-	edges = cv2.GaussianBlur(edges,(n_blur,n_blur), sigma, sigma)
+	edges = cv2.GaussianBlur(edges,(thickness, thickness), sigma, sigma)
 
 	return edges/np.max(edges)
 
@@ -202,7 +229,6 @@ def calculate_gradient(params, edges, lidar_data, M, dt, da):
 
 		p = params.copy()
 		p[i]-=dt if i<3 else da
-		# print(p)
 		R, T = params_to_input(p)
 		s2 = get_score(R, T, scan, M, edges)
 
@@ -214,7 +240,7 @@ def calculate_gradient(params, edges, lidar_data, M, dt, da):
 
 def params_to_input(params):
 	# ordering is x,y,z,p,y,r
-	R = eulerAnglesToRotationMatrix(params[3:]) # TODO load this from yaml file
+	R = eulerAnglesToRotationMatrix(params[3:])
 	T = np.array(params[0:3])
 
 	return R, T
@@ -238,45 +264,35 @@ def eulerAnglesToRotationMatrix(theta):
 					[0, 0,1]
 					])
 					
-	# R = np.dot(R_x, np.dot( R_y, R_z ))
-	# R = R_x @ R_y @ R_z
 	R = R_z @ R_y @ R_x
 
 	return R
 
 def get_score(R, T, pc, M, edges):
-	# from utils import project_lidar_points
-	# disp(pc)
-	# print(R, T)
-	# x = project_lidar_points(pc, edges.shape, R, T, M, np.array([]))
-	# print(x)
-	# if l2im is not None:
-	# 	pts, _, mask = project_lidar_points(pc, edges.shape, R, T, M, np.array([]), l2im=l2im)
-	# else:
+	'''
+	Project point cloud using current solution and calculate the score with regard to edges image
+
+	'''
+
 	pts, _, mask = project_lidar_points(pc, edges.shape, R, T, M, np.array([]))
 
 	pts = pts[mask, :]
 	s = evaluate_solution_edges(edges, pts)
 
-	# e = edges.copy()
-
-	# for point in pts:
-	# 	# print(point)
-	# 	point = (int(point[0]), int(point[1]))
-	# 	cv2.circle(e, point, 3, (255,0,0), cv2.FILLED, lineType=cv2.LINE_AA)
-
-	# print(s)
-
-	# cv2.imshow("a", e)
-	# # key = cv2.waitKey(1) & 0xFF
-	# key = cv2.waitKey(0) & 0xFF
-
-	# if key==ord("q"):
-		# return
-
 	return s
 
 def evaluate_solution_edges(edges, pts):
+	"""
+	sums up the edge image values of projected lidar points
+
+	Args:
+		edges: image of target edges
+		pts: projected lidar points coordinates (2D)
+
+	Returns:
+		score
+
+	"""
 
 	pts = pts.astype(np.int32)
 
@@ -284,3 +300,88 @@ def evaluate_solution_edges(edges, pts):
 
 	# print(sum(inliers))
 	return sum(inliers)
+
+def process_data(camera_name='zed', cfg=None):
+	"""
+	Preprocesses image and LIDAR data, saves to cache
+
+	Args:
+		camera_name
+		cfg: config data (usually in config.yaml)
+
+	"""
+
+	os.makedirs(cfg.GENERAL.cache_dir, exist_ok=True)	
+
+	images_list = sorted(glob.glob(f'{cfg.GENERAL.data_dir}/{camera_name}/*.png'))
+	lidar_list = sorted(glob.glob(f'{cfg.GENERAL.data_dir}/{camera_name}/*.npy'))
+
+	data = []
+
+	for i, (im_fn, lidar_fn) in enumerate(zip(images_list, lidar_list)):
+		name = im_fn.split('/')[-1][:-4]
+		cache_name = f'{cfg.GENERAL.cache_dir}/{name}.npy'
+
+		if os.path.exists(cache_name):
+			d = np.load(cache_name, allow_pickle=True).item()
+		else:
+			im = cv2.imread(im_fn)
+			lidar_raw = np.load(lidar_fn, allow_pickle=True).item()
+			lidar = lidar_raw['pc']
+			# corners = lidar_raw['corners']
+
+			corners = find_corners(im)
+
+			# transform coordinate system
+			lidar[:,:3] = (cfg.GEOMETRY.lidar2camera @ lidar[:,:3].T).T
+			idx = (lidar[:,2]>0) # remove points behind camera
+			lidar = lidar[idx,:]
+
+			# process lidar to edges
+			lidar_ = extract_lidar_edges(lidar)
+
+			# get image edges
+			edges = get_edges(im, cfg.GEOMETRY.M, corners, thickness=int(cfg.IMAGE.edge_thickness))		
+
+			
+			d = {'im': im, 'edges': edges, 'lidar_raw': lidar, 'lidar_edges': lidar_, 'corners': corners}
+			np.save(cache_name, d)
+
+		data.append(d)
+
+	return data
+
+def extract_lidar_edges(pc):
+	"""
+	Extracts lidar points with large difference in distance
+
+	Args:
+		pc: lidar point cloud
+
+	Returns:
+		numpy array of candidate points
+
+	"""
+
+	res = []
+
+	# split into beams
+	for beam_idx in range(16):
+		beam = pc[pc[:,-1]==beam_idx,:]
+		beam = beam[:,:3]
+		beam_ = beam.copy()
+
+		for i, pt in enumerate(beam[:-1]):
+			pt2 = beam[i+1]
+
+			# dynamic threshold
+			min_d = pt[-1] if pt[-1]<pt2[-1] else pt2[-1]
+			dist_thr = min_d*0.5
+
+			if np.abs(pt[-1]-pt2[-1])>dist_thr:
+				if pt[-1]<pt2[-1]: # take closest point
+					res.append(pt)
+				else:
+					res.append(pt2)
+
+	return np.array(res)
