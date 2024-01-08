@@ -1,0 +1,19 @@
+GEOMETRY:
+  "lidar2camera": [[1, 0, 0], [0, 0, -1], [0, 1, 0]]
+
+IMAGE:
+  "edge_thickness": 45
+
+OPTIMIZATION:
+  "n_iter": 500
+  "dt": 0.01 # translation delta (m)
+  "da": 0.1 # angle delta (degrees)
+  "lr": 0.1 # learning rate
+  "final_lr_perc": 0.01
+
+INITIAL_PARAMETERS:
+  ZED: [0, -0.5, 0, -11, 0, 0]
+
+DISPLAY:
+  "display_interval": 30
+  "point_size": 1
