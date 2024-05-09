@@ -34,7 +34,18 @@ def calibrate_extrinsics(camera_name='zed'):
 	width, height, M, D = load_camera_calibration(calib_fn)
 
 	# scale down intrinsics for smaller images
-	M*=cfg.INITIAL_PARAMETERS.ZED.SCALE
+
+	if camera_name=='zed':
+		scale = cfg.INITIAL_PARAMETERS.ZED.SCALE
+		params = cfg.INITIAL_PARAMETERS.ZED.PARAMS
+	elif camera_name=='polarization_camera':
+		scale = cfg.INITIAL_PARAMETERS.POLARIZATION_CAMERA.SCALE
+		params = cfg.INITIAL_PARAMETERS.POLARIZATION_CAMERA.PARAMS
+	else:
+		scale = 1
+
+
+	M*=scale
 	M[-1,-1]=1
 
 	cfg.GEOMETRY.M = M
@@ -49,7 +60,7 @@ def calibrate_extrinsics(camera_name='zed'):
 
 	# optimization loop
 
-	params = cfg.INITIAL_PARAMETERS.ZED.PARAMS
+	
 	learning_rate_decay = np.exp(np.log(cfg.OPTIMIZATION.final_lr_perc)/cfg.OPTIMIZATION.n_iter)
 
 	print(f"Loaded {len(data)} image-lidar pairs")
@@ -75,6 +86,8 @@ def calibrate_extrinsics(camera_name='zed'):
 			R, T = params_to_input(params)
 
 			im = data[cfg.DISPLAY.image_index]['im'].copy()
+			im = cv2.cvtColor(im, cv2.COLOR_RGB2BGR)
+
 			# im = data[cfg.DISPLAY.image_index]['im']
 			s = data[cfg.DISPLAY.image_index]['lidar_raw']
 			a = data[cfg.DISPLAY.image_index]['lidar_edges']
@@ -97,7 +110,10 @@ def calibrate_extrinsics(camera_name='zed'):
 				# print(point)
 				point = (int(point[0]), int(point[1]))
 				clr = (int(clr[0]*255), int(clr[1]*255), int(clr[2]*255))
-				cv2.circle(im, point, cfg.DISPLAY.point_size, clr, cv2.FILLED, lineType=cv2.LINE_AA)
+				# print(point)
+				if point[0]>0 and point[1]>0 and point[0]<im.shape[0] and point[1]<im.shape[1]:
+					cv2.circle(im, point, cfg.DISPLAY.point_size, (255,255,0), cv2.FILLED, lineType=cv2.LINE_AA)
+					# cv2.circle(im, point, cfg.DISPLAY.point_size, clr, cv2.FILLED, lineType=cv2.LINE_AA)
 
 			pts_edges, _, mask_edges = project_lidar_points(a, im.shape, R, T, M, np.array([]))
 			pts_edges = pts_edges[mask_edges, :]
@@ -107,6 +123,8 @@ def calibrate_extrinsics(camera_name='zed'):
 
 			cv2.imshow("image", im)
 			key = cv2.waitKey(1) & 0xFF
+			if n==0:
+				cv2.waitKey(0)
 
 			if key==ord("q"):
 				print("Calibration cancelled")
@@ -122,4 +140,5 @@ def calibrate_extrinsics(camera_name='zed'):
 		key = cv2.waitKey(0) & 0xFF
 
 if __name__=="__main__":
-	calibrate_extrinsics()
+	# calibrate_extrinsics()
+	calibrate_extrinsics(camera_name='polarization_camera')

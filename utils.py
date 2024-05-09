@@ -128,31 +128,24 @@ def get_grid(): # for calibration, not needed really
 	# create grid
 
 	objectPoints= []
-	# grid_size = 0.06 # 6cm
 	grid_size = 0.3
-	# grid_size = 0.05
-	# grid_size = 300
 	rows, cols = 3, 6
 
 	z = 0
 	off = grid_size/2
 
-	# objectPoints.append([0,0.0,0])
-
 	for i in range(rows):
 		row = []
 		for j in range(cols):
-			
-			# objectPoints.append( ((2*j + i%2)*grid_size, i*grid_size, z) )
 			if j%2==0:
-				# p = (j*off,i*grid_size,z)
-				p = (-j*off,i*(-grid_size),z)
+				p = (j*off,i*grid_size,z)
+				# p = (-j*off,i*(-grid_size),z)
 				row.append(p)
 				# row.insert(1, p)
 			else:
 				if i<rows-1:
-					# p = (j*(off),i*(off*2)+off,z)
-					p = (-j*(off),-(i*(off*2)+off),z)
+					p = (j*(off),i*(off*2)+off,z)
+					# p = (-j*(off),-(i*(off*2)+off),z)
 					row.append(p)
 
 		# print(i,j,row)
@@ -186,8 +179,8 @@ def get_grid(): # for calibration, not needed really
 	# plt.gca().set_aspect('equal', 'box')
 	# plt.show()
 
-	objectPoints[:,0]*=-1
-	objectPoints[:,1]*=-1
+	# objectPoints[:,0]*=-1
+	# objectPoints[:,1]*=-1
 
 	return objectPoints
 
@@ -314,11 +307,15 @@ def process_data(camera_name='zed', cfg=None):
 	os.makedirs(cfg.GENERAL.cache_dir, exist_ok=True)	
 
 	images_list = sorted(glob.glob(f'{cfg.GENERAL.data_dir}/{camera_name}/*.png'))
+	if not images_list:
+		images_list = sorted(glob.glob(f'{cfg.GENERAL.data_dir}/{camera_name}/*.jpg'))
+
 	lidar_list = sorted(glob.glob(f'{cfg.GENERAL.data_dir}/{camera_name}/*.npy'))
 
 	data = []
 
 	for i, (im_fn, lidar_fn) in enumerate(zip(images_list, lidar_list)):
+	# for i, (im_fn, lidar_fn) in enumerate(zip(images_list[::5], lidar_list[::5])):
 		name = im_fn.split('/')[-1][:-4]
 		cache_name = f'{cfg.GENERAL.cache_dir}/{name}.npy'
 
@@ -327,10 +324,15 @@ def process_data(camera_name='zed', cfg=None):
 		else:
 			im = cv2.imread(im_fn)
 			lidar_raw = np.load(lidar_fn, allow_pickle=True).item()
+			# print(f'{lidar_raw=}')
 			lidar = lidar_raw['pc']
 			# corners = lidar_raw['corners']
 
 			corners = find_corners(im)
+
+			# print(corners)
+			if corners is None:
+				continue
 
 			# transform coordinate system
 			lidar[:,:3] = (cfg.GEOMETRY.lidar2camera @ lidar[:,:3].T).T
@@ -338,20 +340,37 @@ def process_data(camera_name='zed', cfg=None):
 			lidar = lidar[idx,:]
 
 			# process lidar to edges
-			lidar_ = extract_lidar_edges(lidar)
+
+			grid = get_grid()
+			_, rvec, tvec = cv2.solvePnP(grid, corners, cfg.GEOMETRY.M, None, flags=cv2.SOLVEPNP_IPPE)
+			print(tvec)
+			target_distance = tvec[-1][0]
+			print(target_distance)
+
+			lidar_ = extract_lidar_edges(lidar, target_distance=target_distance)
 
 			# get image edges
 			edges = get_edges(im, cfg.GEOMETRY.M, corners, thickness=int(cfg.IMAGE.edge_thickness))		
 
+
 			
 			d = {'im': im, 'edges': edges, 'lidar_raw': lidar, 'lidar_edges': lidar_, 'corners': corners}
-			np.save(cache_name, d)
+			# np.save(cache_name, d)
 
 		data.append(d)
 
 	return data
 
-def extract_lidar_edges(pc):
+def angle(v1, v2, acute=True):
+	# v1 is your firsr vector
+	# v2 is your second vector
+		angle = np.arccos(np.dot(v1, v2) / (np.linalg.norm(v1) * np.linalg.norm(v2)))
+		if (acute == True):
+			return np.degrees(angle)
+		else:
+			return 2 * np.pi - angle
+
+def extract_lidar_edges(pc, target_distance, distance_margin=1.5):
 	"""
 	Extracts lidar points with large difference in distance
 
@@ -365,23 +384,38 @@ def extract_lidar_edges(pc):
 
 	res = []
 
+	azi_thr = 2
+
 	# split into beams
 	for beam_idx in range(16):
 		beam = pc[pc[:,-1]==beam_idx,:]
 		beam = beam[:,:3]
-		beam_ = beam.copy()
+		# beam_ = beam.copy()
 
 		for i, pt in enumerate(beam[:-1]):
 			pt2 = beam[i+1]
 
+			# print(pt, pt2, angle(pt, pt2))
+			# input()
+
+			azi = angle(pt, pt2)
+
 			# dynamic threshold
 			min_d = pt[-1] if pt[-1]<pt2[-1] else pt2[-1]
 			dist_thr = min_d*0.5
+			dist_thr = 0.5
+			# dist_thr = 0.1
+			# abs_dist_thr = 1
+
+			# if azi>azi_thr:
+			# 	continue
 
 			if np.abs(pt[-1]-pt2[-1])>dist_thr:
 				if pt[-1]<pt2[-1]: # take closest point
-					res.append(pt)
+					if np.abs(pt[-1]-target_distance)<distance_margin:
+						res.append(pt)
 				else:
-					res.append(pt2)
+					if np.abs(pt2[-1]-target_distance)<distance_margin:
+						res.append(pt2)
 
 	return np.array(res)
