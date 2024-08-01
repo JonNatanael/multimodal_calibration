@@ -81,7 +81,7 @@ def calibrate_extrinsics(camera_name='zed'):
 	# input()
 
 	if cfg.DISPLAY.show_progress:
-		cv2.namedWindow("image", cv2.WINDOW_NORMAL | cv2.WINDOW_KEEPRATIO )
+		cv2.namedWindow("image", cv2.WINDOW_AUTOSIZE | cv2.WINDOW_KEEPRATIO )
 
 	# optimization loop
 
@@ -150,9 +150,9 @@ def calibrate_extrinsics(camera_name='zed'):
 			pts_edges = pts_edges[mask_edges, :]
 			for point in pts_edges:
 				point = (int(point[0]), int(point[1]))
-				cv2.circle(im, point, cfg.DISPLAY.point_size+1, (0,255,0), cv2.FILLED, lineType=cv2.LINE_AA)
+				cv2.circle(im, point, cfg.DISPLAY.point_size+2, (0,0,255), cv2.FILLED, lineType=cv2.LINE_AA)
 
-			print(f'{im.shape=}')
+			# print(f'{im.shape=}')
 			cv2.imshow("image", im)
 			key = cv2.waitKey(1) & 0xFF
 			if n==0:

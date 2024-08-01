@@ -321,7 +321,7 @@ def process_data(camera_name='zed', cfg=None, use_cache=True):
 
 
 		name = im_fn.split('/')[-1][:-4]
-		print(name)
+		# print(name)
 
 		cache_name = f'{cfg.GENERAL.cache_dir}/{name}.npy'
 
@@ -370,12 +370,11 @@ def process_data(camera_name='zed', cfg=None, use_cache=True):
 			target_distance = tvec[-1][0]
 			print(target_distance)
 
-			lidar_ = extract_lidar_edges(lidar, target_distance=target_distance)
+			# lidar_ = extract_lidar_edges(lidar, target_distance=target_distance)
+			lidar_ = extract_lidar_edges2(lidar, target_distance=target_distance)
 
 			# get image edges
-			edges = get_edges(im, cfg.GEOMETRY.M, corners, thickness=int(cfg.IMAGE.edge_thickness))		
-
-
+			edges = get_edges(im, cfg.GEOMETRY.M, corners, thickness=int(cfg.IMAGE.edge_thickness))
 			
 			d = {'im': im, 'edges': edges, 'lidar_raw': lidar, 'lidar_edges': lidar_, 'corners': corners, 'target_distance': target_distance}
 			np.save(cache_name, d)
@@ -440,5 +439,120 @@ def extract_lidar_edges(pc, target_distance, distance_margin=1.5):
 				else:
 					if np.abs(pt2[-1]-target_distance)<distance_margin:
 						res.append(pt2)
+
+	return np.array(res)
+
+def is_collinear(a,b,c, thr = 0.01):
+
+
+	########### https://stackoverflow.com/a/9609069
+
+	x1, y1 = b[0] - a[0], b[1] - a[1]
+	x2, y2 = c[0] - a[0], c[1] - a[1]
+	return abs(x1 * y2 - x2 * y1) < thr
+
+def extract_lidar_edges2(pc, target_distance, distance_margin=1.5):
+	"""
+	Extracts lidar points with large difference in distance
+	but does this by implementing the algorith from the paper correctly
+
+	Args:
+		pc: lidar point cloud
+
+	Returns:
+		numpy array of candidate points
+
+	"""
+
+	res = []
+	lines = []
+	lines2 = []
+	line_thr=0.05 # threshold for collinearity
+
+	dist_thr = 0.5 # threshold for line break
+	len_thr = 5 # minimal number of points in line
+
+	display=True
+	display=False
+
+	for beam_idx in range(1,16):
+		beam = pc[pc[:,-1]==beam_idx,0:3] # extract beam
+
+		p0 = beam[0,:]
+		p1 = beam[1,:]
+
+		start = p0
+		end = p1
+		cur_len = 0
+		
+		for pt_idx, pt in enumerate(beam[2:,:]):
+
+			if display and pt_idx%100==0:
+				# draw points
+				points = np.array([start, end, pt])
+				# points = np.array([pt])
+				# points_cur, _, mask_cur = project_lidar_points(points, im.shape, R, T, M, np.array([]))
+				
+
+				plt.clf()
+
+				plt.plot(beam[:,0], beam[:,2], 'g.')
+				for i, point in enumerate(points):
+					# print(point)
+					if i==0:
+						plt.plot(point[0], point[2], 'r*', markersize=10)
+					elif i==1:
+						plt.plot(point[0], point[2], 'y*', markersize=10)
+					else:
+						plt.plot(point[0], point[2], 'b*', markersize=10)
+
+				if lines:
+					# print(lines)
+					lines_ = np.array(lines)
+					lines2_ = np.array(lines2)
+					# plt.plot(lines_[:,0], lines_[:,2], 'k.')
+					for i, (start, end) in enumerate(lines2_):
+						# print(f'{start=}')
+						# print(f'{end=}')
+						plt.plot([start[0], end[0]], [start[2], end[2]], 'y', linewidth=3)
+					# plt.plot(lines_[:,0], lines_[:,2], 'k.')
+
+				plt.gca().set_aspect('equal', adjustable='box')
+				
+				plt.draw(); plt.pause(0.01)
+				# plt.waitforbuttonpress()
+
+			ok = is_collinear(start, end, pt, thr=line_thr)
+
+			if norm(pt-end)>dist_thr:
+				# print("breaking for distance")
+				ok = False
+
+			if ok:
+				cur_len+=1
+				end = pt
+			else:
+				if cur_len>=len_thr:
+					# lines2.append((start,end))
+					lines.append(start)
+					lines.append(end)
+					lines2.append((start,end))
+
+					# get distances of the endpoint of previous 
+					d1 = norm(end)
+					d2 = norm(pt)
+					if d1 < d2:
+						d_start = norm(start)
+						d_end = norm(end)
+						if np.abs(d_start-target_distance)<distance_margin and np.abs(d_end-target_distance)<distance_margin:
+							res.append(start)
+							res.append(end)
+
+				start = pt.copy()
+				end = pt.copy()
+
+				cur_len=0
+
+	# print(np.array(res))
 
 	return np.array(res)
