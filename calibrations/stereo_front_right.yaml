@@ -1,0 +1,21 @@
+%YAML:1.0
+---
+DataType: CameraCalibration
+imageSize: !!opencv-matrix
+   rows: 2
+   cols: 1
+   dt: d
+   data: [ 1080., 896. ]
+cameraMatrix: !!opencv-matrix
+   rows: 3
+   cols: 3
+   dt: d
+   data: [ 7.2915999999999997e+02, 0., 3.7770602057007289e+02, 0.,
+       7.2915999999999997e+02, 4.7623888397671976e+02, 0., 0., 1. ]
+distCoeffs: !!opencv-matrix
+   rows: 1
+   cols: 5
+   dt: d
+   data: [ -3.2305394532651721e-01, 1.0868495714167971e-01,
+       4.2228656463341408e-03, 3.9926317931078455e-04,
+       8.1937934518512640e-02 ]

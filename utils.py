@@ -294,7 +294,7 @@ def evaluate_solution_edges(edges, pts):
 	# print(sum(inliers))
 	return sum(inliers)
 
-def process_data(camera_name='zed', cfg=None):
+def process_data(camera_name='zed', cfg=None, use_cache=True):
 	"""
 	Preprocesses image and LIDAR data, saves to cache
 
@@ -304,7 +304,9 @@ def process_data(camera_name='zed', cfg=None):
 
 	"""
 
-	os.makedirs(cfg.GENERAL.cache_dir, exist_ok=True)	
+	os.makedirs(cfg.GENERAL.cache_dir, exist_ok=True)
+	os.makedirs(cfg.GENERAL.cache_dir+'/'+camera_name, exist_ok=True)
+	# use_cache	
 
 	images_list = sorted(glob.glob(f'{cfg.GENERAL.data_dir}/{camera_name}/*.png'))
 	if not images_list:
@@ -316,19 +318,40 @@ def process_data(camera_name='zed', cfg=None):
 
 	for i, (im_fn, lidar_fn) in enumerate(zip(images_list, lidar_list)):
 	# for i, (im_fn, lidar_fn) in enumerate(zip(images_list[::5], lidar_list[::5])):
+
+
 		name = im_fn.split('/')[-1][:-4]
+		print(name)
+
 		cache_name = f'{cfg.GENERAL.cache_dir}/{name}.npy'
 
-		if os.path.exists(cache_name):
+		if os.path.exists(cache_name) and cfg.GENERAL.use_cache:
 			d = np.load(cache_name, allow_pickle=True).item()
 		else:
 			im = cv2.imread(im_fn)
+			im = cv2.undistort(im, cfg.M, cfg.D)
+			print(f'{im.shape=}')
 			lidar_raw = np.load(lidar_fn, allow_pickle=True).item()
 			# print(f'{lidar_raw=}')
-			lidar = lidar_raw['pc']
+			try:
+				lidar = lidar_raw['pc']
+			except:
+				# print(lidar_raw.keys())
+				# print(lidar_raw['scans'])
+				# input()
+				# continue
+				lidar = lidar_raw['scans'][0]
 			# corners = lidar_raw['corners']
 
-			corners = find_corners(im)
+			if camera_name=='thermal_camera':
+				corners = find_corners(255-im)
+			elif 'stereo' in camera_name:
+				corners = find_corners(im)
+				if corners is None:
+					corners = find_corners(255-im)
+			else:
+				corners = find_corners(im)
+
 
 			# print(corners)
 			if corners is None:
@@ -354,8 +377,8 @@ def process_data(camera_name='zed', cfg=None):
 
 
 			
-			d = {'im': im, 'edges': edges, 'lidar_raw': lidar, 'lidar_edges': lidar_, 'corners': corners}
-			# np.save(cache_name, d)
+			d = {'im': im, 'edges': edges, 'lidar_raw': lidar, 'lidar_edges': lidar_, 'corners': corners, 'target_distance': target_distance}
+			np.save(cache_name, d)
 
 		data.append(d)
 

@@ -2,6 +2,8 @@ GENERAL:
   "calibration_dir": 'calibrations'
   "data_dir": 'calib_data'
   "cache_dir": 'cache'
+  "use_cache": true
+  # "use_cache": false
 
 GEOMETRY:
   "lidar2camera": [[1, 0, 0], [0, 0, -1], [0, 1, 0]]
@@ -9,7 +11,7 @@ GEOMETRY:
 IMAGE:
   "edge_thickness": 45
   # "edge_thickness": 30
-  "edge_thickness": 20
+  # "edge_thickness": 20
   # "edge_thickness": 10
 
 OPTIMIZATION:
@@ -24,17 +26,28 @@ OPTIMIZATION:
 
 INITIAL_PARAMETERS:
   ZED:
-    PARAMS: [0, -0.5, 0, -11, 0, 0] 
+    # PARAMS: [0, -0.5, 0, -11, 0, 0]
+    PARAMS: [0, -0.5, 0, -14, 0, 0]
     SCALE: 0.5
   POLARIZATION_CAMERA:
-    PARAMS: [0, -0.5, 0, -13, 1, 0] 
+    PARAMS: [0, -0.5, 0, -13, 1, 0]
+    SCALE: 1.0
+  THERMAL_CAMERA:
+    PARAMS: [0, -0.5, 0, -13, 0, 0]
+    SCALE: 1.0
+  STEREO_FRONT_LEFT:
+    PARAMS: [0, -0.5, 0, -11, 0, 0]
+    SCALE: 1.0
+  STEREO_FRONT_RIGHT:
+    PARAMS: [0, -0.5, 0, -7, 0, 0]
     SCALE: 1.0
 
 DISPLAY:
   "image_index": 0
-  "image_index": 1
+  # "image_index": 1
   "show_progress": false
   "show_progress": true
-  "display_interval": 50
-  "display_interval": 5
+  # "display_interval": 50
+  "display_interval": 15
+  # "display_interval": 5
   "point_size": 1

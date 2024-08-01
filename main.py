@@ -30,19 +30,31 @@ def calibrate_extrinsics(camera_name='zed'):
 	cfg.GEOMETRY.lidar2camera = np.array(cfg.GEOMETRY.lidar2camera)
 
 	# load intrinsics
-	calib_fn = f'{cfg.GENERAL.calibration_dir}/{camera_name}.yaml'
-	width, height, M, D = load_camera_calibration(calib_fn)
+	try:
+		calib_fn = f'{cfg.GENERAL.calibration_dir}/{camera_name}.yaml'
+		print(calib_fn)
+		width, height, M, D = load_camera_calibration(calib_fn)
+	except:
+		# print("calibration not found!")
+		return
 
 	# scale down intrinsics for smaller images
 
-	if camera_name=='zed':
-		scale = cfg.INITIAL_PARAMETERS.ZED.SCALE
-		params = cfg.INITIAL_PARAMETERS.ZED.PARAMS
-	elif camera_name=='polarization_camera':
-		scale = cfg.INITIAL_PARAMETERS.POLARIZATION_CAMERA.SCALE
-		params = cfg.INITIAL_PARAMETERS.POLARIZATION_CAMERA.PARAMS
-	else:
-		scale = 1
+	print(cfg)
+
+	scale = getattr(cfg.INITIAL_PARAMETERS, camera_name.upper()).SCALE
+	params = getattr(cfg.INITIAL_PARAMETERS, camera_name.upper()).PARAMS
+	cfg.M = M
+	cfg.D = D
+
+	# if camera_name=='zed':
+	# 	scale = cfg.INITIAL_PARAMETERS.ZED.SCALE
+	# 	params = cfg.INITIAL_PARAMETERS.ZED.PARAMS
+	# elif camera_name=='polarization_camera':
+	# 	scale = cfg.INITIAL_PARAMETERS.POLARIZATION_CAMERA.SCALE
+	# 	params = cfg.INITIAL_PARAMETERS.POLARIZATION_CAMERA.PARAMS
+	# else:
+	# 	scale = 1
 
 
 	M*=scale
@@ -52,16 +64,31 @@ def calibrate_extrinsics(camera_name='zed'):
 	cfg.GEOMETRY.D = D
 
 	# load and preprocess LIDAR data
-	data = process_data(camera_name, cfg)
+	data = process_data(camera_name, cfg, use_cache=cfg.GENERAL.use_cache)
 
+	if not data:
+		print(f"no data found for {camera_name}")
+		return
+
+	min_dist = 1e3
+	closest_data_index = None
+	for idx, d in enumerate(data):
+		if d['target_distance']<min_dist:
+			min_dist = d['target_distance']
+			closest_data_index = idx
+
+	# print(data)
+	# input()
 
 	if cfg.DISPLAY.show_progress:
-		cv2.namedWindow("image", cv2.WINDOW_NORMAL)
+		cv2.namedWindow("image", cv2.WINDOW_NORMAL | cv2.WINDOW_KEEPRATIO )
 
 	# optimization loop
 
 	
 	learning_rate_decay = np.exp(np.log(cfg.OPTIMIZATION.final_lr_perc)/cfg.OPTIMIZATION.n_iter)
+
+	test_idx = np.random.choice(np.arange(len(data)))
 
 	print(f"Loaded {len(data)} image-lidar pairs")
 	print(f"Starting optimization for {camera_name}")
@@ -85,14 +112,18 @@ def calibrate_extrinsics(camera_name='zed'):
 
 			R, T = params_to_input(params)
 
-			im = data[cfg.DISPLAY.image_index]['im'].copy()
+			# test_idx = closest_data_index
+			# test_idx = cfg.DISPLAY.image_index
+			# test_idx = np.random.choice(np.arange(len(data)))
+
+			im = data[test_idx]['im'].copy()
 			im = cv2.cvtColor(im, cv2.COLOR_RGB2BGR)
 
-			# im = data[cfg.DISPLAY.image_index]['im']
-			s = data[cfg.DISPLAY.image_index]['lidar_raw']
-			a = data[cfg.DISPLAY.image_index]['lidar_edges']
-			e = data[cfg.DISPLAY.image_index]['edges']
-			c = data[cfg.DISPLAY.image_index]['corners']
+			# im = data[test_idx]['im']
+			s = data[test_idx]['lidar_raw']
+			a = data[test_idx]['lidar_edges']
+			e = data[test_idx]['edges']
+			c = data[test_idx]['corners']
 
 			im = im.astype(np.float32)/255
 			e = cv2.cvtColor(e, cv2.COLOR_GRAY2RGB)
@@ -121,6 +152,7 @@ def calibrate_extrinsics(camera_name='zed'):
 				point = (int(point[0]), int(point[1]))
 				cv2.circle(im, point, cfg.DISPLAY.point_size+1, (0,255,0), cv2.FILLED, lineType=cv2.LINE_AA)
 
+			print(f'{im.shape=}')
 			cv2.imshow("image", im)
 			key = cv2.waitKey(1) & 0xFF
 			if n==0:
@@ -141,4 +173,7 @@ def calibrate_extrinsics(camera_name='zed'):
 
 if __name__=="__main__":
 	# calibrate_extrinsics()
-	calibrate_extrinsics(camera_name='polarization_camera')
+	# calibrate_extrinsics(camera_name='polarization_camera')
+	# calibrate_extrinsics(camera_name='thermal_camera')
+	# calibrate_extrinsics(camera_name='stereo_front_left')
+	calibrate_extrinsics(camera_name='stereo_front_right')
