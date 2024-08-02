@@ -101,7 +101,6 @@ def project_lidar_points(point_cloud, sz, R, t, M, D, rn=1e6, cmap_name='turbo_r
 
 	return pts, colors, mask
 
-
 # lidar processing
 
 def get_mask(shape, rvec, tvec, M):
@@ -323,7 +322,7 @@ def process_data(camera_name='zed', cfg=None, use_cache=True):
 		name = im_fn.split('/')[-1][:-4]
 		# print(name)
 
-		cache_name = f'{cfg.GENERAL.cache_dir}/{name}.npy'
+		cache_name = f'{cfg.GENERAL.cache_dir}/{camera_name}/{name}.npy'
 
 		if os.path.exists(cache_name) and cfg.GENERAL.use_cache:
 			d = np.load(cache_name, allow_pickle=True).item()
