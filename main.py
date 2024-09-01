@@ -173,7 +173,7 @@ def calibrate_extrinsics(camera_name='zed'):
 
 if __name__=="__main__":
 	# calibrate_extrinsics()
-	# calibrate_extrinsics(camera_name='polarization_camera')
+	calibrate_extrinsics(camera_name='polarization_camera')
 	# calibrate_extrinsics(camera_name='thermal_camera')
 	# calibrate_extrinsics(camera_name='stereo_front_left')
-	calibrate_extrinsics(camera_name='stereo_front_right')
+	# calibrate_extrinsics(camera_name='stereo_front_right')
