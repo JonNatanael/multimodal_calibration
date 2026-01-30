@@ -328,7 +328,11 @@ def process_data(camera_name='zed', cfg=None, use_cache=True):
 			d = np.load(cache_name, allow_pickle=True).item()
 		else:
 			im = cv2.imread(im_fn)
-			im = cv2.undistort(im, cfg.M, cfg.D)
+			if camera_name is not 'zed':
+				im = cv2.undistort(im, cfg.M, cfg.D)
+			else:
+				# print(cfg)
+				im = cv2.resize(im, (int(cfg.width), int(cfg.height)), interpolation=cv2.INTER_AREA)
 			print(f'{im.shape=}')
 			lidar_raw = np.load(lidar_fn, allow_pickle=True).item()
 			# print(f'{lidar_raw=}')
@@ -375,7 +379,7 @@ def process_data(camera_name='zed', cfg=None, use_cache=True):
 			# get image edges
 			edges = get_edges(im, cfg.GEOMETRY.M, corners, thickness=int(cfg.IMAGE.edge_thickness))
 			
-			d = {'im': im, 'edges': edges, 'lidar_raw': lidar, 'lidar_edges': lidar_, 'corners': corners, 'target_distance': target_distance}
+			d = {'im': im, 'edges': edges, 'lidar_raw': lidar, 'lidar_edges': lidar_, 'corners': corners, 'target_distance': target_distance, 'name': name}
 			np.save(cache_name, d)
 
 		data.append(d)

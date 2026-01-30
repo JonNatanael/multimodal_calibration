@@ -25,7 +25,8 @@ def calibrate_extrinsics(camera_name='zed'):
 	with open("config.yaml", 'r') as f:
 		cfg = wrap_namespace(yaml.safe_load(f))
 
-	res_fn = f'{camera_name}_lidar.yaml'
+	# res_fn = f'{camera_name}_lidar.yaml'
+	res_fn = f'calibrations/{camera_name}_lidar.yaml'
 
 	cfg.GEOMETRY.lidar2camera = np.array(cfg.GEOMETRY.lidar2camera)
 
@@ -46,6 +47,8 @@ def calibrate_extrinsics(camera_name='zed'):
 	params = getattr(cfg.INITIAL_PARAMETERS, camera_name.upper()).PARAMS
 	cfg.M = M
 	cfg.D = D
+	cfg.height = height
+	cfg.width = width
 
 	# if camera_name=='zed':
 	# 	scale = cfg.INITIAL_PARAMETERS.ZED.SCALE
@@ -81,7 +84,8 @@ def calibrate_extrinsics(camera_name='zed'):
 	# input()
 
 	if cfg.DISPLAY.show_progress:
-		cv2.namedWindow("image", cv2.WINDOW_AUTOSIZE | cv2.WINDOW_KEEPRATIO )
+		cv2.namedWindow("image", cv2.WINDOW_AUTOSIZE | cv2.WINDOW_KEEPRATIO | cv2.WINDOW_NORMAL )
+		# cv2.namedWindow("image", cv2.WINDOW_NORMAL )
 
 	# optimization loop
 
@@ -97,10 +101,22 @@ def calibrate_extrinsics(camera_name='zed'):
 		print(f"{n}/{cfg.OPTIMIZATION.n_iter}", end='\r')
 
 		# get random sample
-		d = np.random.choice(data)
+		# d = np.random.choice(data)
 
-		# calculate gradients with current parameters
-		G = calculate_gradient(params, d['edges'], d['lidar_edges'], M, cfg.OPTIMIZATION.dt, cfg.OPTIMIZATION.da)
+		# # calculate gradients with current parameters
+		# G = calculate_gradient(params, d['edges'], d['lidar_edges'], M, cfg.OPTIMIZATION.dt, cfg.OPTIMIZATION.da)
+
+		# minibatch
+		N_samples = len(data)
+		N_samples = 1
+		N_samples = 5
+		N_samples = 10
+
+		d = np.random.choice(data, N_samples)
+		G = 0
+		for sample in d:
+			# calculate gradients with current parameters
+			G+=calculate_gradient(params, sample['edges'], sample['lidar_edges'], M, cfg.OPTIMIZATION.dt, cfg.OPTIMIZATION.da)
 
 		# update parameters
 		params-=(cfg.OPTIMIZATION.lr*G)
@@ -113,11 +129,14 @@ def calibrate_extrinsics(camera_name='zed'):
 			R, T = params_to_input(params)
 
 			# test_idx = closest_data_index
-			# test_idx = cfg.DISPLAY.image_index
+			test_idx = cfg.DISPLAY.image_index
 			# test_idx = np.random.choice(np.arange(len(data)))
 
 			im = data[test_idx]['im'].copy()
+			nm = data[test_idx]['name']
+			# print(f'{nm=}')
 			im = cv2.cvtColor(im, cv2.COLOR_RGB2BGR)
+			im = cv2.resize(im, (int(width), int(height)), interpolation=cv2.INTER_AREA)
 
 			# im = data[test_idx]['im']
 			s = data[test_idx]['lidar_raw']
@@ -174,6 +193,6 @@ def calibrate_extrinsics(camera_name='zed'):
 if __name__=="__main__":
 	# calibrate_extrinsics()
 	# calibrate_extrinsics(camera_name='polarization_camera')
-	# calibrate_extrinsics(camera_name='thermal_camera')
+	calibrate_extrinsics(camera_name='thermal_camera')
 	# calibrate_extrinsics(camera_name='stereo_front_left')
-	calibrate_extrinsics(camera_name='stereo_front_right')
+	# calibrate_extrinsics(camera_name='stereo_front_right')

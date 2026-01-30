@@ -9,28 +9,42 @@ GEOMETRY:
   "lidar2camera": [[1, 0, 0], [0, 0, -1], [0, 1, 0]]
 
 IMAGE:
-  "edge_thickness": 45
+  # "edge_thickness": 45
+  # "edge_thickness": 35
   # "edge_thickness": 30
   # "edge_thickness": 20
-  # "edge_thickness": 10
+  "edge_thickness": 10
+  # "edge_thickness": 5
 
 OPTIMIZATION:
+  # "n_iter": 50
+  # "n_iter": 200
   "n_iter": 500
+  # "n_iter": 1000
+  # "dt": 0.01 # translation delta (m)
+  # "da": 0.1 # angle delta (degrees)
   "dt": 0.01 # translation delta (m)
   "da": 0.1 # angle delta (degrees)
-  "lr": 0.1 # learning rate
-  "lr": 0.02 # learning rate
+  # "lr": 0.2 # learning rate
+  # "lr": 0.1 # learning rate
+  "lr": 0.05 # learning rate
+  # "lr": 0.02 # learning rate
   # "lr": 0.01 # learning rate
-  # "final_lr_perc": 0.01
-  "final_lr_perc": 0.1
+  "final_lr_perc": 0.01
+  # "final_lr_perc": 0.05
+  # "final_lr_perc": 0.1
 
 INITIAL_PARAMETERS:
   ZED:
     # PARAMS: [0, -0.5, 0, -11, 0, 0]
-    PARAMS: [0, -0.5, 0, -14, 0, 0]
-    SCALE: 0.5
+    # PARAMS: [0, -0.5, 0, -14, 0, 0]
+    # PARAMS: [0, -0.8, 0, -14, 0, 0]
+    PARAMS: [0, -0.8, 0, -13, 0, 0]
+    # SCALE: 0.5
+    SCALE: 1.0
   POLARIZATION_CAMERA:
     PARAMS: [0, -0.5, 0, -13, 1, 0]
+    # PARAMS: [0, -0.5, 0, -11, 1, 0]
     SCALE: 1.0
   THERMAL_CAMERA:
     PARAMS: [0, -0.5, 0, -13, 0, 0]
@@ -44,7 +58,7 @@ INITIAL_PARAMETERS:
 
 DISPLAY:
   "image_index": 0
-  # "image_index": 1
+  "image_index": 5
   "show_progress": false
   "show_progress": true
   # "display_interval": 50
