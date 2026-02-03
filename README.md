@@ -2,7 +2,8 @@
 This repository contains the reference implementation of the approach presented in the paper *Joint Calibration of a Multimodal Sensor System for Autonomous Vehicles* by Jon Muhovič and Janez Perš.
 
 bibtex:
-```@article{muhovivc2023joint,
+```
+@article{muhovivc2023joint,
   title={Joint Calibration of a Multimodal Sensor System for Autonomous Vehicles},
   author={Muhovi{\v{c}}, Jon and Per{\v{s}}, Janez},
   journal={Sensors},
