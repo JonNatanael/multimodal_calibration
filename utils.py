@@ -303,9 +303,10 @@ def process_data(camera_name='zed', cfg=None, use_cache=True):
 
 	"""
 
-	os.makedirs(cfg.GENERAL.cache_dir, exist_ok=True)
-	os.makedirs(cfg.GENERAL.cache_dir+'/'+camera_name, exist_ok=True)
-	# use_cache	
+	if use_cache:
+		os.makedirs(cfg.GENERAL.cache_dir, exist_ok=True)
+		os.makedirs(cfg.GENERAL.cache_dir+'/'+camera_name, exist_ok=True)
+		# use_cache	
 
 	images_list = sorted(glob.glob(f'{cfg.GENERAL.data_dir}/{camera_name}/*.png'))
 	if not images_list:
@@ -318,9 +319,9 @@ def process_data(camera_name='zed', cfg=None, use_cache=True):
 	for i, (im_fn, lidar_fn) in enumerate(zip(images_list, lidar_list)):
 	# for i, (im_fn, lidar_fn) in enumerate(zip(images_list[::5], lidar_list[::5])):
 
-
+		# fix backslashes
+		im_fn = im_fn.replace('\\', '/')
 		name = im_fn.split('/')[-1][:-4]
-		# print(name)
 
 		cache_name = f'{cfg.GENERAL.cache_dir}/{camera_name}/{name}.npy'
 
@@ -381,6 +382,7 @@ def process_data(camera_name='zed', cfg=None, use_cache=True):
 			
 			d = {'im': im, 'edges': edges, 'lidar_raw': lidar, 'lidar_edges': lidar_, 'corners': corners, 'target_distance': target_distance, 'name': name}
 			np.save(cache_name, d)
+
 
 		data.append(d)
 
