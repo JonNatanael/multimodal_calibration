@@ -2,7 +2,7 @@
 This repository contains the reference implementation of the approach presented in the paper *Joint Calibration of a Multimodal Sensor System for Autonomous Vehicles* by Jon Muhovič and Janez Perš.
 
 bibtex:
->@article{muhovivc2023joint,
+```@article{muhovivc2023joint,
   title={Joint Calibration of a Multimodal Sensor System for Autonomous Vehicles},
   author={Muhovi{\v{c}}, Jon and Per{\v{s}}, Janez},
   journal={Sensors},
@@ -12,6 +12,7 @@ bibtex:
   year={2023},
   publisher={MDPI}
 }
+```
 
 ## What this code does
 The calibration pipeline aligns a LiDAR point cloud to a camera by optimizing a 6-DOF rigid transform (translation + roll/pitch/yaw) so projected LiDAR edges match image edges of a calibration target. It:
