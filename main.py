@@ -19,11 +19,14 @@ def _wrap_dict(ob):
 def _wrap_list(ob):
     return [wrap_namespace(v) for v in ob]
 
-def calibrate_extrinsics(camera_name='zed'):
+def calibrate_extrinsics(camera_name=None):
 
 	# load config
 	with open("config.yaml", 'r') as f:
 		cfg = wrap_namespace(yaml.safe_load(f))
+
+	if camera_name is None:
+		camera_name = cfg.GENERAL.camera_name
 
 	# res_fn = f'{camera_name}_lidar.yaml'
 	res_fn = f'calibrations/{camera_name}_lidar.yaml'
@@ -107,11 +110,7 @@ def calibrate_extrinsics(camera_name='zed'):
 		# G = calculate_gradient(params, d['edges'], d['lidar_edges'], M, cfg.OPTIMIZATION.dt, cfg.OPTIMIZATION.da)
 
 		# minibatch
-		N_samples = len(data)
-		N_samples = 1
-		N_samples = 5
-		N_samples = 10
-
+		N_samples = min(cfg.OPTIMIZATION.batch_size, len(data))
 		d = np.random.choice(data, N_samples)
 		G = 0
 		for sample in d:
@@ -191,8 +190,4 @@ def calibrate_extrinsics(camera_name='zed'):
 		key = cv2.waitKey(0) & 0xFF
 
 if __name__=="__main__":
-	# calibrate_extrinsics()
-	calibrate_extrinsics(camera_name='polarization_camera')
-	# calibrate_extrinsics(camera_name='thermal_camera')
-	# calibrate_extrinsics(camera_name='stereo_front_left')
-	# calibrate_extrinsics(camera_name='stereo_front_right')
+	calibrate_extrinsics()

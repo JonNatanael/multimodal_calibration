@@ -303,9 +303,13 @@ def process_data(camera_name='zed', cfg=None, use_cache=True):
 
 	"""
 
+	cache_root = os.path.join(
+		cfg.GENERAL.cache_dir,
+		camera_name,
+		f"edge_thickness_{cfg.IMAGE.edge_thickness}",
+	)
 	if use_cache:
-		os.makedirs(cfg.GENERAL.cache_dir, exist_ok=True)
-		os.makedirs(cfg.GENERAL.cache_dir+'/'+camera_name, exist_ok=True)
+		os.makedirs(cache_root, exist_ok=True)
 		# use_cache	
 
 	images_list = sorted(glob.glob(f'{cfg.GENERAL.data_dir}/{camera_name}/*.png'))
@@ -323,7 +327,7 @@ def process_data(camera_name='zed', cfg=None, use_cache=True):
 		im_fn = im_fn.replace('\\', '/')
 		name = im_fn.split('/')[-1][:-4]
 
-		cache_name = f'{cfg.GENERAL.cache_dir}/{camera_name}/{name}.npy'
+		cache_name = os.path.join(cache_root, f"{name}.npy")
 
 		if os.path.exists(cache_name) and cfg.GENERAL.use_cache:
 			d = np.load(cache_name, allow_pickle=True).item()
