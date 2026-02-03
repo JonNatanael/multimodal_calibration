@@ -4,14 +4,18 @@ GENERAL:
   "cache_dir": 'cache'
 
   "camera_name": 'zed'
-  "camera_name": 'polarization_camera'
-  "camera_name": 'thermal_camera'
+  # "camera_name": 'polarization_camera'
+  # "camera_name": 'thermal_camera'
 
   "use_cache": true
   # "use_cache": false
 
 GEOMETRY:
   "lidar2camera": [[1, 0, 0], [0, 0, -1], [0, 1, 0]]
+  "target_height": 1.05
+  "target_width": 1.48
+  "offset_x": 0.365
+  "offset_y": 0.215
 
 IMAGE:
   "edge_thickness": 30

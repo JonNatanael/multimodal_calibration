@@ -98,17 +98,19 @@ def project_lidar_points(point_cloud, sz, R, t, M, D, rn=1e6, cmap_name='turbo_r
 
 # lidar processing
 
-def get_mask(shape, rvec, tvec, M):
+def get_mask(shape, rvec, tvec, M, target_width = 1.48, target_height=1.05, offset_x=0.365, offset_y=0.215):
 
 	# define target plane
-	plane_w = -1.48
-	plane_h = -1.05
-	points = np.array([[0,0,0],[0,plane_h,0],[plane_w,plane_h,0],[plane_w,0,0]])
-	points[:,0]+=0.365
-	points[:,1]+=0.215
+	# plane_w = -1.48
+	# plane_h = -1.05
+	points = np.array([[0,0,0],[0,target_height,0],[target_width,target_height,0],[target_width,0,0]])
+	# points[:,0]-=0.365
+	# points[:,1]-=0.215
+	points[:,0]-=offset_x
+	points[:,1]-=offset_y
 
-	points[:,0]*=-1
-	points[:,1]*=-1
+	# points[:,0]*=-1
+	# points[:,1]*=-1
 
 	corner_pts, _ = cv2.projectPoints(points, rvec, tvec, M, distCoeffs=None)
 	corner_pts = corner_pts[:,0,:]
@@ -139,7 +141,7 @@ def find_corners(im, patternsize = (3,5)):
 
 	return corners if ret else None
 
-def get_edges(im, M, corners, thickness=1):
+def get_edges(im, M, corners, thickness, target_width, target_height, offset_x, offset_y):
 
 	grid = get_grid()
 	points = get_grid()
@@ -148,7 +150,7 @@ def get_edges(im, M, corners, thickness=1):
 
 	corner_pts, _ = cv2.projectPoints(points, rvec, tvec, M, distCoeffs=None)
 	corner_pts = corner_pts[:,0,:]
-	mask = get_mask(im.shape[:-1], rvec, tvec, M)
+	mask = get_mask(im.shape[:-1], rvec, tvec, M, target_width=target_width, target_height=target_height, offset_x=offset_x, offset_y=offset_y)
 
 	thickness+=1 if thickness%2==0 else 0
 
@@ -320,7 +322,7 @@ def process_data(camera_name='zed', cfg=None, use_cache=True):
 			lidar_ = extract_lidar_edges2(lidar, target_distance=target_distance)
 
 			# get image edges
-			edges = get_edges(im, cfg.GEOMETRY.M, corners, thickness=int(cfg.IMAGE.edge_thickness))
+			edges = get_edges(im, cfg.GEOMETRY.M, corners, thickness=int(cfg.IMAGE.edge_thickness), target_width=cfg.GEOMETRY.target_width, target_height=cfg.GEOMETRY.target_height, offset_x=cfg.GEOMETRY.offset_x, offset_y=cfg.GEOMETRY.offset_y)
 			
 			d = {'im': im, 'edges': edges, 'lidar_raw': lidar, 'lidar_edges': lidar_, 'corners': corners, 'target_distance': target_distance, 'name': name}
 
