@@ -1,10 +1,10 @@
-
 import cv2, os, glob
 import numpy as np
 import matplotlib.pyplot as plt
-# from mayavi import mlab
 from numpy.linalg import norm
 
+from types import SimpleNamespace
+from functools import singledispatch
 
 # LOADING and SAVING data
 
@@ -60,7 +60,7 @@ def save_lidar_calibration_data(filename, R, T, C): # save
 
 # LIDAR PROJECTION
 
-def get_colors(points, rnge=100, relative=False, cmap_name='Wistia', cmap_len=256, nonlinear_factor=1):
+def get_colors(points, rnge=100, relative=False, cmap_name='Wistia', cmap_len=256):
 	colors = []
 	dist = np.sqrt(points[0,:]**2+points[1,:]**2+points[2,:]**2)
 
@@ -69,9 +69,6 @@ def get_colors(points, rnge=100, relative=False, cmap_name='Wistia', cmap_len=25
 
 	f = dist/rnge
 	f = np.clip(f, 0, 1)
-
-	if nonlinear_factor!=1:
-		f = np.power(f, nonlinear_factor)
 	
 	cmap = plt.get_cmap(cmap_name)
 	sm = plt.cm.ScalarMappable(cmap=cmap)
@@ -85,15 +82,13 @@ def get_colors(points, rnge=100, relative=False, cmap_name='Wistia', cmap_len=25
 
 	return np.array(colors)
 
-def project_lidar_points(point_cloud, sz, R, t, M, D, rn=1e6, cmap_name='turbo_r', cmap_len=256, nonlinear_factor=1):
+def project_lidar_points(point_cloud, sz, R, t, M, D, rn=1e6, cmap_name='turbo_r', cmap_len=256):
 	pc = point_cloud[:,:3].copy().T
-	# idx = (pc[2,:]>0) # remove points behind camera
-	# pc = pc[:,idx]
 
 	if pc.shape[1]==0:
 		return pc, None, None
 
-	colors = get_colors(pc, rn, cmap_name=cmap_name, cmap_len=cmap_len, nonlinear_factor=nonlinear_factor)
+	colors = get_colors(pc, rn, cmap_name=cmap_name, cmap_len=cmap_len)
 
 	pts, _ = cv2.projectPoints(pc, R, t, M, distCoeffs=D) # TODO change this for simpler projection
 	pts = pts[:,0,:]
@@ -118,70 +113,25 @@ def get_mask(shape, rvec, tvec, M):
 	corner_pts, _ = cv2.projectPoints(points, rvec, tvec, M, distCoeffs=None)
 	corner_pts = corner_pts[:,0,:]
 
-	mask = np.zeros(shape,dtype=np.uint8)
+	mask = np.zeros(shape, dtype=np.uint8)
 	cv2.fillPoly(mask, pts = [corner_pts.astype(np.int32)], color=(255,255,255))
 
 	return mask
 
-def get_grid(): # for calibration, not needed really
-	# create grid
+def get_grid(pattern_size=(3,5), square_size=0.15):
+	objp = []
 
-	objectPoints= []
-	grid_size = 0.3
-	rows, cols = 3, 6
+	for i in range(pattern_size[1]):  # height
+		for j in range(pattern_size[0]):  # width
+			x = (2 * j + i % 2) * square_size
+			y = i * square_size
+			z = 0
+			objp.append((x, y, z))
 
-	z = 0
-	off = grid_size/2
+	# Convert to numpy array
+	objp = np.array(objp, dtype=np.float32)
 
-	for i in range(rows):
-		row = []
-		for j in range(cols):
-			if j%2==0:
-				p = (j*off,i*grid_size,z)
-				# p = (-j*off,i*(-grid_size),z)
-				row.append(p)
-				# row.insert(1, p)
-			else:
-				if i<rows-1:
-					p = (j*(off),i*(off*2)+off,z)
-					# p = (-j*(off),-(i*(off*2)+off),z)
-					row.append(p)
-
-		# print(i,j,row)
-		# print(row[::2], row[1::2])
-		if i<rows-1:
-			row = row[::2]+row[1::2]
-		# else:
-		# 	pass
-
-		# print(i,j,row,'\n')
-
-		objectPoints.extend(row)
-
-
-		
-
-	# for i in range(cols):
-	# 	for j in range(rows):
-	# 		if j>0:
-	# 			# objectPoints.append( (i*grid_size, (2*j + i%2)*grid_size, 0) )
-	# 			# objectPoints.append( (i*grid_size, (2*j + i%2)*grid_size, z) )
-	# 			objectPoints.append( ((2*j + i%2)*grid_size, i*grid_size, z) )
-	# 		else:
-	# 			if i%2==1:
-	# 				# print(i,(i*grid_size, (2*j + i%2)*grid_size, 0))
-					# objectPoints.append( (i*grid_size, (2*j + i%2)*grid_size, z) )
-
-	objectPoints= np.array(objectPoints).astype('float32')
-
-	# plt.scatter(objectPoints[:,0], objectPoints[:,1])
-	# plt.gca().set_aspect('equal', 'box')
-	# plt.show()
-
-	# objectPoints[:,0]*=-1
-	# objectPoints[:,1]*=-1
-
-	return objectPoints
+	return objp
 
 def find_corners(im, patternsize = (3,5)):
 
@@ -192,15 +142,17 @@ def find_corners(im, patternsize = (3,5)):
 def get_edges(im, M, corners, thickness=1):
 
 	grid = get_grid()
+	points = get_grid()
 
 	_, rvec, tvec = cv2.solvePnP(grid, corners, M, None, flags=cv2.SOLVEPNP_IPPE)
+
+	corner_pts, _ = cv2.projectPoints(points, rvec, tvec, M, distCoeffs=None)
+	corner_pts = corner_pts[:,0,:]
 	mask = get_mask(im.shape[:-1], rvec, tvec, M)
 
-	# n_blur = thickness
 	thickness+=1 if thickness%2==0 else 0
 
 	sigma = thickness//5
-	# sigma = n_blur//10
 
 	edges = cv2.Canny(mask, threshold1=0, threshold2=100).astype(np.float32)
 	edges = cv2.GaussianBlur(edges,(thickness, thickness), sigma, sigma)
@@ -290,7 +242,6 @@ def evaluate_solution_edges(edges, pts):
 
 	inliers = list(map(lambda x: edges[x[1],x[0]], pts))
 
-	# print(sum(inliers))
 	return sum(inliers)
 
 def process_data(camera_name='zed', cfg=None, use_cache=True):
@@ -310,7 +261,6 @@ def process_data(camera_name='zed', cfg=None, use_cache=True):
 	)
 	if use_cache:
 		os.makedirs(cache_root, exist_ok=True)
-		# use_cache	
 
 	images_list = sorted(glob.glob(f'{cfg.GENERAL.data_dir}/{camera_name}/*.png'))
 	if not images_list:
@@ -321,7 +271,8 @@ def process_data(camera_name='zed', cfg=None, use_cache=True):
 	data = []
 
 	for i, (im_fn, lidar_fn) in enumerate(zip(images_list, lidar_list)):
-	# for i, (im_fn, lidar_fn) in enumerate(zip(images_list[::5], lidar_list[::5])):
+
+		print(f'processing data: {i}/{len(images_list)}', end='\r')
 
 		# fix backslashes
 		im_fn = im_fn.replace('\\', '/')
@@ -333,23 +284,14 @@ def process_data(camera_name='zed', cfg=None, use_cache=True):
 			d = np.load(cache_name, allow_pickle=True).item()
 		else:
 			im = cv2.imread(im_fn)
-			if camera_name is not 'zed':
+			if camera_name!='zed':
 				im = cv2.undistort(im, cfg.M, cfg.D)
-			else:
-				# print(cfg)
-				im = cv2.resize(im, (int(cfg.width), int(cfg.height)), interpolation=cv2.INTER_AREA)
-			print(f'{im.shape=}')
+
+			im = cv2.resize(im, (int(cfg.width), int(cfg.height)), interpolation=cv2.INTER_AREA)
+
 			lidar_raw = np.load(lidar_fn, allow_pickle=True).item()
-			# print(f'{lidar_raw=}')
-			try:
-				lidar = lidar_raw['pc']
-			except:
-				# print(lidar_raw.keys())
-				# print(lidar_raw['scans'])
-				# input()
-				# continue
-				lidar = lidar_raw['scans'][0]
-			# corners = lidar_raw['corners']
+
+			lidar = lidar_raw['pc']
 
 			if camera_name=='thermal_camera':
 				corners = find_corners(255-im)
@@ -360,8 +302,6 @@ def process_data(camera_name='zed', cfg=None, use_cache=True):
 			else:
 				corners = find_corners(im)
 
-
-			# print(corners)
 			if corners is None:
 				continue
 
@@ -371,12 +311,10 @@ def process_data(camera_name='zed', cfg=None, use_cache=True):
 			lidar = lidar[idx,:]
 
 			# process lidar to edges
-
 			grid = get_grid()
 			_, rvec, tvec = cv2.solvePnP(grid, corners, cfg.GEOMETRY.M, None, flags=cv2.SOLVEPNP_IPPE)
-			print(tvec)
+
 			target_distance = tvec[-1][0]
-			print(target_distance)
 
 			# lidar_ = extract_lidar_edges(lidar, target_distance=target_distance)
 			lidar_ = extract_lidar_edges2(lidar, target_distance=target_distance)
@@ -385,15 +323,16 @@ def process_data(camera_name='zed', cfg=None, use_cache=True):
 			edges = get_edges(im, cfg.GEOMETRY.M, corners, thickness=int(cfg.IMAGE.edge_thickness))
 			
 			d = {'im': im, 'edges': edges, 'lidar_raw': lidar, 'lidar_edges': lidar_, 'corners': corners, 'target_distance': target_distance, 'name': name}
-			np.save(cache_name, d)
 
+			if cfg.GENERAL.use_cache:
+				np.save(cache_name, d)
 
 		data.append(d)
 
 	return data
 
 def angle(v1, v2, acute=True):
-	# v1 is your firsr vector
+	# v1 is your first vector
 	# v2 is your second vector
 		angle = np.arccos(np.dot(v1, v2) / (np.linalg.norm(v1) * np.linalg.norm(v2)))
 		if (acute == True):
@@ -421,13 +360,9 @@ def extract_lidar_edges(pc, target_distance, distance_margin=1.5):
 	for beam_idx in range(16):
 		beam = pc[pc[:,-1]==beam_idx,:]
 		beam = beam[:,:3]
-		# beam_ = beam.copy()
 
 		for i, pt in enumerate(beam[:-1]):
 			pt2 = beam[i+1]
-
-			# print(pt, pt2, angle(pt, pt2))
-			# input()
 
 			azi = angle(pt, pt2)
 
@@ -435,11 +370,6 @@ def extract_lidar_edges(pc, target_distance, distance_margin=1.5):
 			min_d = pt[-1] if pt[-1]<pt2[-1] else pt2[-1]
 			dist_thr = min_d*0.5
 			dist_thr = 0.5
-			# dist_thr = 0.1
-			# abs_dist_thr = 1
-
-			# if azi>azi_thr:
-			# 	continue
 
 			if np.abs(pt[-1]-pt2[-1])>dist_thr:
 				if pt[-1]<pt2[-1]: # take closest point
@@ -452,37 +382,29 @@ def extract_lidar_edges(pc, target_distance, distance_margin=1.5):
 	return np.array(res)
 
 def is_collinear(a,b,c, thr = 0.01):
-
-
 	########### https://stackoverflow.com/a/9609069
 
 	x1, y1 = b[0] - a[0], b[1] - a[1]
 	x2, y2 = c[0] - a[0], c[1] - a[1]
 	return abs(x1 * y2 - x2 * y1) < thr
 
-def extract_lidar_edges2(pc, target_distance, distance_margin=1.5):
+def extract_lidar_edges2(pc, target_distance, distance_margin=1.5, line_thr=0.05, dist_thr=0.5, len_thr=5):
 	"""
 	Extracts lidar points with large difference in distance
-	but does this by implementing the algorith from the paper correctly
+	but does this by implementing the algorithm from the paper correctly
 
 	Args:
 		pc: lidar point cloud
+		line_thr: threshold for collinearity
+		dist_thr: threshold for line break
+		len_thr: minimal number of points in line
 
 	Returns:
 		numpy array of candidate points
 
 	"""
 
-	res = []
-	lines = []
-	lines2 = []
-	line_thr=0.05 # threshold for collinearity
-
-	dist_thr = 0.5 # threshold for line break
-	len_thr = 5 # minimal number of points in line
-
-	display=True
-	display=False
+	res = []	
 
 	for beam_idx in range(1,16):
 		beam = pc[pc[:,-1]==beam_idx,0:3] # extract beam
@@ -496,45 +418,9 @@ def extract_lidar_edges2(pc, target_distance, distance_margin=1.5):
 		
 		for pt_idx, pt in enumerate(beam[2:,:]):
 
-			if display and pt_idx%100==0:
-				# draw points
-				points = np.array([start, end, pt])
-				# points = np.array([pt])
-				# points_cur, _, mask_cur = project_lidar_points(points, im.shape, R, T, M, np.array([]))
-				
-
-				plt.clf()
-
-				plt.plot(beam[:,0], beam[:,2], 'g.')
-				for i, point in enumerate(points):
-					# print(point)
-					if i==0:
-						plt.plot(point[0], point[2], 'r*', markersize=10)
-					elif i==1:
-						plt.plot(point[0], point[2], 'y*', markersize=10)
-					else:
-						plt.plot(point[0], point[2], 'b*', markersize=10)
-
-				if lines:
-					# print(lines)
-					lines_ = np.array(lines)
-					lines2_ = np.array(lines2)
-					# plt.plot(lines_[:,0], lines_[:,2], 'k.')
-					for i, (start, end) in enumerate(lines2_):
-						# print(f'{start=}')
-						# print(f'{end=}')
-						plt.plot([start[0], end[0]], [start[2], end[2]], 'y', linewidth=3)
-					# plt.plot(lines_[:,0], lines_[:,2], 'k.')
-
-				plt.gca().set_aspect('equal', adjustable='box')
-				
-				plt.draw(); plt.pause(0.01)
-				# plt.waitforbuttonpress()
-
 			ok = is_collinear(start, end, pt, thr=line_thr)
 
 			if norm(pt-end)>dist_thr:
-				# print("breaking for distance")
 				ok = False
 
 			if ok:
@@ -542,11 +428,6 @@ def extract_lidar_edges2(pc, target_distance, distance_margin=1.5):
 				end = pt
 			else:
 				if cur_len>=len_thr:
-					# lines2.append((start,end))
-					lines.append(start)
-					lines.append(end)
-					lines2.append((start,end))
-
 					# get distances of the endpoint of previous 
 					d1 = norm(end)
 					d2 = norm(pt)
@@ -562,6 +443,18 @@ def extract_lidar_edges2(pc, target_distance, distance_margin=1.5):
 
 				cur_len=0
 
-	# print(np.array(res))
-
 	return np.array(res)
+
+# YAML
+@singledispatch
+def wrap_namespace(ob):
+    return ob
+
+@wrap_namespace.register(dict)
+def _wrap_dict(ob):
+    return SimpleNamespace(**{k: wrap_namespace(v) for k, v in ob.items()})
+
+@wrap_namespace.register(list)
+def _wrap_list(ob):
+
+    return [wrap_namespace(v) for v in ob]

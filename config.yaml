@@ -1,8 +1,12 @@
 GENERAL:
   "calibration_dir": 'calibrations'
-  "data_dir": 'calib_data'
+  "data_dir": 'data'
   "cache_dir": 'cache'
+
+  "camera_name": 'zed'
   "camera_name": 'polarization_camera'
+  "camera_name": 'thermal_camera'
+
   "use_cache": true
   # "use_cache": false
 
@@ -10,60 +14,33 @@ GEOMETRY:
   "lidar2camera": [[1, 0, 0], [0, 0, -1], [0, 1, 0]]
 
 IMAGE:
-  # "edge_thickness": 45
-  # "edge_thickness": 35
-  # "edge_thickness": 30
-  # "edge_thickness": 20
-  "edge_thickness": 10
-  # "edge_thickness": 5
+  "edge_thickness": 30
 
 OPTIMIZATION:
-  # "n_iter": 50
-  # "n_iter": 200
-  "n_iter": 500
-  # "n_iter": 1000
+  "n_iter": 200
   "batch_size": 10
-  # "dt": 0.01 # translation delta (m)
-  # "da": 0.1 # angle delta (degrees)
-  "dt": 0.01 # translation delta (m)
-  "da": 0.1 # angle delta (degrees)
-  # "lr": 0.2 # learning rate
-  # "lr": 0.1 # learning rate
-  "lr": 0.05 # learning rate
-  # "lr": 0.02 # learning rate
-  # "lr": 0.01 # learning rate
+  # "batch_size": 5
+  "dt": 0.001 # translation delta (m)
+  "da": 0.01 # angle delta (degrees)
+  "lr": 0.1 # learning rate
   "final_lr_perc": 0.01
-  # "final_lr_perc": 0.05
-  # "final_lr_perc": 0.1
 
 INITIAL_PARAMETERS:
   ZED:
-    # PARAMS: [0, -0.5, 0, -11, 0, 0]
-    # PARAMS: [0, -0.5, 0, -14, 0, 0]
-    # PARAMS: [0, -0.8, 0, -14, 0, 0]
-    PARAMS: [0, -0.8, 0, -13, 0, 0]
-    # SCALE: 0.5
-    SCALE: 1.0
+    PARAMS: [0, -0.5, 0, -13, 0, 0]
   POLARIZATION_CAMERA:
     PARAMS: [0, -0.5, 0, -13, 1, 0]
-    # PARAMS: [0, -0.5, 0, -11, 1, 0]
-    SCALE: 1.0
   THERMAL_CAMERA:
     PARAMS: [0, -0.5, 0, -13, 0, 0]
-    SCALE: 1.0
   STEREO_FRONT_LEFT:
-    PARAMS: [0, -0.5, 0, -11, 0, 0]
-    SCALE: 1.0
+    PARAMS: [0, -0.5, 0, -13, 0, 0]
   STEREO_FRONT_RIGHT:
     PARAMS: [0, -0.5, 0, -7, 0, 0]
-    SCALE: 1.0
 
 DISPLAY:
-  "image_index": 0
-  "image_index": 5
+  "image_index": 7
   "show_progress": false
   "show_progress": true
-  # "display_interval": 50
   "display_interval": 15
-  # "display_interval": 5
   "point_size": 1
+  "lidar_range": 10
